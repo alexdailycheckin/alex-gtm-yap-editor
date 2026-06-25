@@ -55,6 +55,27 @@ questions and saves your `brand-config.json`; after that it just edits in your b
 - `.../references/` — tuning notes
 - `.../brand-config.example.json` — the config schema (or let the first-run interview write it)
 
+## Author
+
+Created by **Alex Mureșan** — [alexmuresan.com](https://alexmuresan.com). Go-to-market
+distribution. If this is useful, a credit and a link back are appreciated.
+
 ## License
 
-Personal/internal use. Contact the owner before redistributing.
+Licensed under the **PolyForm Noncommercial License 1.0.0** (full text in
+[LICENSE.md](LICENSE.md); attribution in [NOTICE](NOTICE)).
+
+In plain English:
+
+- **Free to use, modify, and share for noncommercial purposes** — personal projects,
+  learning, research, hobby use, nonprofits, schools.
+- **You must keep the credit.** Any copy, fork, or derivative you pass on has to keep the
+  `Required Notice` line from [NOTICE](NOTICE) (Copyright Alex Mureșan, alexmuresan.com).
+  That is the attribution requirement, not optional.
+- **Commercial use is not granted by this license.** Selling it, building a paid product or
+  service on it, or running it inside a for-profit company's operations needs a separate
+  commercial license. Contact **alex@alexmuresan.com**.
+
+This keeps it open for people to use and learn from while reserving the commercial rights.
+A license does not stop a determined copier, but it makes credit a legal obligation that
+legitimate users and companies honor.

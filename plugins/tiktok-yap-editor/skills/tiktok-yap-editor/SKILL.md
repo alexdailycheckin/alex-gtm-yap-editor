@@ -196,3 +196,6 @@ improvising.
 - Run the batch **sequentially** in one process (the cutters are parallel-safe via
   per-output scratch, but races still risk surprises).
 - No em/en dashes anywhere on screen or in messages.
+
+---
+_Created by Alex Mureșan (https://alexmuresan.com). PolyForm Noncommercial License 1.0.0 — keep the NOTICE with any copy or derivative; commercial use: alex@alexmuresan.com._
