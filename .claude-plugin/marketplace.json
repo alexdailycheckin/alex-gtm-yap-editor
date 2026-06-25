@@ -1,0 +1,11 @@
+{
+  "name": "alex-gtm-yap-editor",
+  "owner": { "name": "Alex Muresan" },
+  "metadata": {
+    "description": "Standalone marketplace for the TikTok Yap Editor skill: turn raw talking-head phone clips into finished vertical TikTok/Reels/Shorts. Brand-agnostic (first-run brand discovery).",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    { "name": "tiktok-yap-editor", "source": "./plugins/tiktok-yap-editor", "description": "Turn raw talking-head phone clips into finished vertical TikTok/Reels/Shorts: transcript-first story cut, zero-dead-air, brand captions, spoken-outro CTA. Brand-agnostic via brand-config." }
+  ]
+}

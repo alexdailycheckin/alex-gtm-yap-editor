@@ -1,0 +1,27 @@
+{
+  "_README": "Per-creator brand config. The skill writes this on first run by interviewing you (see SKILL.md 'First run: brand discovery'). Save the real file at <footage>/.yap_build/brand-config.json or the skill root. yapfull.sh reads it. Replace the values below with yours.",
+  "_fields": {
+    "caption_font": "installed font family for captions ('Montserrat Black' = default ALL-CAPS look, or a brand display font in sentence case)",
+    "label_font": "font for the handle/contact block (a mono reads well, e.g. 'Space Mono')",
+    "caption_case": "'on' = ALL CAPS, 'off' = sentence case",
+    "accent_hex": "single spark/highlight colour like '#FF5A2A', or 'none'",
+    "base_hex": "caption fill (usually white)",
+    "ink_hex": "stroke colour (usually near-black)",
+    "handle": "on-screen handle at the CTA, e.g. 'YOURNAME.COM'",
+    "contact_lines": "extra lines under the handle (email, site)",
+    "cta_clip": "OPTIONAL absolute path to a reusable spoken-outro clip; add it as the final clause in each clauses.json"
+  },
+  "creator": "Your Name",
+  "niche": "what your channel is about, one line",
+  "pillars": ["pillar 1", "pillar 2", "pillar 3"],
+  "accounts": ["yoursite.com"],
+  "caption_font": "Montserrat Black",
+  "label_font": "Space Mono",
+  "caption_case": "on",
+  "accent_hex": "none",
+  "base_hex": "#FFFFFF",
+  "ink_hex": "#111111",
+  "handle": "YOURNAME.COM",
+  "contact_lines": ["you@example.com", "yoursite.com"],
+  "cta_clip": ""
+}

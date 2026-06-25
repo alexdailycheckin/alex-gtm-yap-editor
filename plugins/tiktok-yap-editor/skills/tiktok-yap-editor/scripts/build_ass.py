@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""Generate a styled .ass caption file from whisper -dtw word-level JSON.
+
+This is the libass-era replacement for caption_frames.py. Instead of rendering
+one transparent PNG per frame and compositing with overlay, we emit a single
+.ass subtitle file and burn it in one ffmpeg pass (see compose_ass.sh). It is
+far faster (no per-frame PNGs), less code, and easy to restyle.
+
+It needs an ffmpeg built WITH libass (the `ass`/`subtitles` filter). The default
+Homebrew `ffmpeg` bottle does NOT have it; install `ffmpeg-full` and link it
+(`brew install ffmpeg-full && brew link --overwrite --force ffmpeg-full`).
+preflight.py asserts this. If you are on a crippled ffmpeg, fall back to
+caption_frames.py + compose.sh.
+
+Caption behaviour matches the proven house style: a STABLE phrase block (default
+3 words) with the currently-spoken word emphasised (karaoke). "Emphasis" depends
+on the preset: minimal scales the active word only (clean, on-brand default),
+bold/native also recolour it.
+
+PRESETS (pick with --preset, default minimal):
+  minimal  Dynamic Minimalism, Alex's default. Montserrat, white, NO neon, the
+           active word just scales up. Reads premium, structure stays invisible.
+  bold     Hormozi-style for YouTube long-form repurpose. Anton, ALL CAPS, neon
+           yellow active word, thick stroke, big pop. Use OFF the main feed.
+  native   TikTok-native. Montserrat, sentence case, white + soft shadow, a
+           subtle accent on the active word.
+
+Input is whisper -oj -ml 1 -sow -dtw word JSON (transcription[].offsets.from/to
+in ms, .text). Optional corrections JSON fixes transcriber slips without
+re-running audio:  {"drop": [110,111], "fix": {"117": "Be", "122": "They"}}
+
+Usage:
+  python3 build_ass.py --words words.json --out captions.ass \
+    [--preset minimal|bold|native] \
+    [--hook "YOUR HOOK LINE|SECOND LINE"] [--corrections corr.json] \
+    [--accent '#FFDE00'] [--font 'Montserrat'] [--caps on|off] \
+    [--cap-y 1320] [--hook-y 640] [--group 3] [--active-scale 113]
+
+Notes on ASS:
+  - Colours are &HBBGGRR (NOT RGB) with inverted alpha. hex_to_ass() handles it.
+  - Coordinates run from top-left of a 1080x1920 PlayRes canvas.
+  - We anchor every line middle-centre (\\an5) and \\pos it, so scaling a single
+    word keeps the line centred.
+"""
+import argparse, json, re, sys
+
+W, H = 1080, 1920
+
+# preset -> style defaults. accent=None means "no colour, scale only".
+PRESETS = {
+    "minimal": dict(font="Montserrat Black", bold=False, base="#FFFFFF",
+                    outline="#000000", outline_px=7, shadow_px=1,
+                    accent=None, caps=True, active_scale=116,
+                    cap_size=90, cap_y=1320, hook_size=120, hook_y=640,
+                    hook_accent=False, spacing=0),
+    "bold": dict(font="Anton", bold=True, base="#FFFFFF",
+                 outline="#000000", outline_px=9, shadow_px=0,
+                 accent="#FFDE00", caps=True, active_scale=122,
+                 cap_size=96, cap_y=1300, hook_size=132, hook_y=620,
+                 hook_accent=True, spacing=1),
+    "native": dict(font="Montserrat Black", bold=False, base="#FFFFFF",
+                   outline="#000000", outline_px=7, shadow_px=2,
+                   accent="#FFD23F", caps=False, active_scale=110,
+                   cap_size=82, cap_y=1340, hook_size=116, hook_y=650,
+                   hook_accent=False, spacing=0),
+}
+
+
+def hex_to_ass(h):
+    """#RRGGBB -> &H00BBGGRR (opaque)."""
+    h = h.lstrip("#")
+    r, g, b = h[0:2], h[2:4], h[4:6]
+    return f"&H00{b}{g}{r}".upper()
+
+
+def cs(t):
+    """seconds -> H:MM:SS.cc (centiseconds), ASS time format."""
+    if t < 0:
+        t = 0
+    h = int(t // 3600); m = int((t % 3600) // 60)
+    s = t % 60
+    return f"{h}:{m:02d}:{s:05.2f}"
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--words", required=True)
+    ap.add_argument("--out", default="captions.ass")
+    ap.add_argument("--preset", choices=list(PRESETS), default="minimal")
+    ap.add_argument("--hook", default="")
+    ap.add_argument("--corrections", default="")
+    ap.add_argument("--accent", default=None, help="override active-word colour, e.g. '#FFDE00' or 'none'")
+    ap.add_argument("--font", default=None)
+    ap.add_argument("--caps", choices=["on", "off"], default=None)
+    ap.add_argument("--cap-y", type=int, default=None)
+    ap.add_argument("--hook-y", type=int, default=None)
+    ap.add_argument("--group", type=int, default=3)
+    ap.add_argument("--active-scale", type=int, default=None)
+    ap.add_argument("--hook-secs", type=float, default=2.5)
+    a = ap.parse_args()
+
+    p = dict(PRESETS[a.preset])
+    if a.font: p["font"] = a.font
+    if a.caps: p["caps"] = (a.caps == "on")
+    if a.cap_y is not None: p["cap_y"] = a.cap_y
+    if a.hook_y is not None: p["hook_y"] = a.hook_y
+    if a.active_scale is not None: p["active_scale"] = a.active_scale
+    if a.accent is not None:
+        p["accent"] = None if a.accent.lower() in ("none", "off", "") else a.accent
+
+    d = json.load(open(a.words))
+    words = [[s["offsets"]["from"] / 1000.0, s["offsets"]["to"] / 1000.0, s["text"].strip()]
+             for s in d["transcription"] if s["text"].strip()]
+    if not words:
+        sys.exit("no words in transcript")
+
+    if a.corrections:
+        c = json.load(open(a.corrections)); drop = set(c.get("drop", []))
+        fix = {int(k): v for k, v in c.get("fix", {}).items()}
+        words = [[w[0], w[1], fix.get(i, w[2])] for i, w in enumerate(words) if i not in drop]
+
+    eos = lambda t: t.rstrip()[-1:] in ".?!"
+    def disp(t):
+        t = re.sub(r"[,;:]+$", "", t)            # strip trailing soft punctuation
+        t = re.sub(r"[.!?]+$", "", t)            # keep it clean on screen
+        t = t.replace("{", "(").replace("}", ")")  # ASS-safe
+        return t.upper() if p["caps"] else t
+
+    # stable phrase groups (same logic as caption_frames.py)
+    groups, cur = [], []
+    for w in words:
+        cur.append(w)
+        if len(cur) >= a.group or eos(w[2]):
+            groups.append(cur); cur = []
+    if cur: groups.append(cur)
+
+    base_ass = hex_to_ass(p["base"])
+    accent_ass = hex_to_ass(p["accent"]) if p["accent"] else base_ass
+    out_ass = hex_to_ass(p["outline"])
+    SC = p["active_scale"]
+
+    # --- build dialogue lines: one per active word so the highlight moves ---
+    events = []
+
+    def line_text(toks, active):
+        parts = []
+        for i, t in enumerate(toks):
+            if i == active:
+                if p["accent"]:
+                    parts.append(f"{{\\fscx{SC}\\fscy{SC}\\1c{accent_ass}}}{t}{{\\fscx100\\fscy100\\1c{base_ass}}}")
+                else:
+                    parts.append(f"{{\\fscx{SC}\\fscy{SC}}}{t}{{\\fscx100\\fscy100}}")
+            else:
+                parts.append(t)
+        body = " ".join(parts)
+        return f"{{\\an5\\pos({W // 2},{p['cap_y']})}}{body}"
+
+    for gi, g in enumerate(groups):
+        gend = groups[gi + 1][0][0] if gi + 1 < len(groups) else g[-1][1] + 0.30
+        toks = [disp(w[2]) for w in g]
+        for k in range(len(g)):
+            st = g[k][0]
+            en = g[k + 1][0] if k + 1 < len(g) else gend
+            if en <= st:
+                en = st + 0.08
+            events.append((st, en, "Cap", line_text(toks, k)))
+
+    # --- hook line (upper-middle, fades in/out) ---
+    if a.hook:
+        hlines = [s for s in a.hook.split("|") if s]
+        if hlines:
+            txt = "\\N".join(l.upper() if p["caps"] else l for l in hlines)
+            hk_col = accent_ass if p["hook_accent"] else base_ass
+            ht = (f"{{\\an5\\pos({W // 2},{p['hook_y']})\\1c{hk_col}\\fad(150,250)}}{txt}")
+            events.append((0.0, a.hook_secs, "Hook", ht))
+
+    events.sort(key=lambda e: e[0])
+
+    bold = "-1" if p["bold"] else "0"
+    # V4+ style fields: see header. BorderStyle 1 = outline+shadow.
+    style_fmt = ("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+                 "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+                 "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+                 "Alignment, MarginL, MarginR, MarginV, Encoding")
+    cap_style = (f"Style: Cap,{p['font']},{p['cap_size']},{base_ass},{base_ass},"
+                 f"{out_ass},&H64000000,{bold},0,0,0,100,100,{p['spacing']},0,1,"
+                 f"{p['outline_px']},{p['shadow_px']},5,90,90,0,0")
+    hook_style = (f"Style: Hook,{p['font']},{p['hook_size']},{base_ass},{base_ass},"
+                  f"{out_ass},&H64000000,{bold},0,0,0,100,100,{p['spacing']},0,1,"
+                  f"{p['outline_px'] + 1},{p['shadow_px']},5,80,80,0,0")
+
+    lines = []
+    lines.append("[Script Info]")
+    lines.append("ScriptType: v4.00+")
+    lines.append("WrapStyle: 2")
+    lines.append("ScaledBorderAndShadow: yes")
+    lines.append(f"PlayResX: {W}")
+    lines.append(f"PlayResY: {H}")
+    lines.append("")
+    lines.append("[V4+ Styles]")
+    lines.append(style_fmt)
+    lines.append(cap_style)
+    lines.append(hook_style)
+    lines.append("")
+    lines.append("[Events]")
+    lines.append("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text")
+    for st, en, style, txt in events:
+        lines.append(f"Dialogue: 0,{cs(st)},{cs(en)},{style},,0,0,0,,{txt}")
+
+    open(a.out, "w").write("\n".join(lines) + "\n")
+    print(f"wrote {a.out}  (preset={a.preset}, font={p['font']}, "
+          f"accent={p['accent'] or 'scale-only'}, {len(groups)} phrase-groups, "
+          f"{len(events)} events)")
+
+
+if __name__ == "__main__":
+    main()
