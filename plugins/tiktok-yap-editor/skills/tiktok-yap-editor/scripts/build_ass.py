@@ -97,6 +97,15 @@ def main():
     ap.add_argument("--group", type=int, default=3)
     ap.add_argument("--active-scale", type=int, default=None)
     ap.add_argument("--hook-secs", type=float, default=2.5)
+    ap.add_argument("--hook-anim", choices=["none", "typewriter"], default="none",
+                    help="typewriter = reveal the hook character-by-character with a cursor")
+    ap.add_argument("--hook-spark", default="",
+                    help="word in the hook to colour in the accent on the held frame")
+    ap.add_argument("--overlays", default="",
+                    help="JSON list of {type:source|counter,...} extra timed overlays")
+    ap.add_argument("--accent-hex", default="",
+                    help="brand accent colour for hook spark + counter, even when "
+                         "the caption highlight is scale-only (--accent none)")
     a = ap.parse_args()
 
     p = dict(PRESETS[a.preset])
@@ -137,6 +146,8 @@ def main():
     base_ass = hex_to_ass(p["base"])
     accent_ass = hex_to_ass(p["accent"]) if p["accent"] else base_ass
     out_ass = hex_to_ass(p["outline"])
+    # spark/counter accent: explicit --accent-hex wins, else the caption accent
+    spark_ass = hex_to_ass(a.accent_hex) if a.accent_hex else accent_ass
     SC = p["active_scale"]
 
     # --- build dialogue lines: one per active word so the highlight moves ---
@@ -165,14 +176,74 @@ def main():
                 en = st + 0.08
             events.append((st, en, "Cap", line_text(toks, k)))
 
-    # --- hook line (upper-middle, fades in/out) ---
+    # --- hook line (upper-middle) ---
     if a.hook:
         hlines = [s for s in a.hook.split("|") if s]
         if hlines:
-            txt = "\\N".join(l.upper() if p["caps"] else l for l in hlines)
+            disp_lines = [l.upper() if p["caps"] else l for l in hlines]
+            full = "\\N".join(disp_lines)
             hk_col = accent_ass if p["hook_accent"] else base_ass
-            ht = (f"{{\\an5\\pos({W // 2},{p['hook_y']})\\1c{hk_col}\\fad(150,250)}}{txt}")
-            events.append((0.0, a.hook_secs, "Hook", ht))
+            pos = f"\\an5\\pos({W // 2},{p['hook_y']})"
+
+            def spark(text):
+                """Colour the spark word in the accent on the held hook."""
+                if not a.hook_spark:
+                    return text
+                wd = a.hook_spark.upper() if p["caps"] else a.hook_spark
+                return text.replace(wd, f"{{\\1c{spark_ass}}}{wd}{{\\1c{hk_col}}}", 1)
+
+            if a.hook_anim == "typewriter":
+                # reveal unit-by-unit (a "\\N" line break counts as one unit)
+                units, i = [], 0
+                while i < len(full):
+                    if full[i:i + 2] == "\\N":
+                        units.append("\\N"); i += 2
+                    else:
+                        units.append(full[i]); i += 1
+                type_dur = min(1.1, a.hook_secs * 0.55)
+                step = type_dur / max(1, len(units))
+                for k in range(1, len(units) + 1):
+                    sub = "".join(units[:k])
+                    cursor = "" if k == len(units) else "▌"  # ▌
+                    st = (k - 1) * step
+                    en = k * step if k < len(units) else type_dur
+                    events.append((st, en + 0.001, "Hook",
+                                   f"{{{pos}\\1c{hk_col}}}{sub}{cursor}"))
+                # held full hook (with spark), fades out
+                events.append((type_dur, a.hook_secs, "Hook",
+                               f"{{{pos}\\1c{hk_col}\\fad(0,250)}}{spark(full)}"))
+            else:
+                events.append((0.0, a.hook_secs, "Hook",
+                               f"{{{pos}\\1c{hk_col}\\fad(150,250)}}{spark(full)}"))
+
+    # --- optional extra overlays: source lower-thirds + number count-ups ---
+    if a.overlays:
+        for o in json.load(open(a.overlays)):
+            ot = o.get("type")
+            if ot == "source":
+                txt = o["text"].replace("{", "(").replace("}", ")")
+                events.append((o["start"], o["end"], "Cap",
+                               f"{{\\an1\\pos(48,1500)\\fn Space Mono\\fs32\\bord4\\shad0"
+                               f"\\1c{base_ass}\\3c{out_ass}\\fad(150,150)}}{txt}"))
+            elif ot == "counter":
+                y = o.get("y", 540)
+                target = int(re.sub(r"[^0-9]", "", str(o["value"])) or 0)
+                steps = 12
+                cdur = min(0.9, (o["end"] - o["start"]) * 0.5)
+                for s in range(steps):
+                    val = f"{int(target * s / steps):,}"
+                    st = o["start"] + (s / steps) * cdur
+                    en = o["start"] + ((s + 1) / steps) * cdur
+                    events.append((st, en, "Cap",
+                                   f"{{\\an5\\pos({W // 2},{y})\\fn {p['font']}\\fs118\\bord7"
+                                   f"\\1c{accent_ass}\\3c{base_ass}}}{val}"))
+                events.append((o["start"] + cdur, o["end"], "Cap",
+                               f"{{\\an5\\pos({W // 2},{y})\\fn {p['font']}\\fs118\\bord7"
+                               f"\\1c{accent_ass}\\3c{base_ass}\\fad(0,150)}}{o['value']}"))
+                if o.get("label"):
+                    events.append((o["start"], o["end"], "Cap",
+                                   f"{{\\an5\\pos({W // 2},{y + 92})\\fn Space Mono\\fs32\\fsp2"
+                                   f"\\bord4\\1c{base_ass}\\3c{out_ass}\\fad(150,150)}}{o['label']}"))
 
     events.sort(key=lambda e: e[0])
 

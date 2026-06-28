@@ -174,6 +174,21 @@ clean CFR pass. It also fixes the two things creators always flag:
   it twice", even with clean audio): alternating static crop (1.00/1.06, hard cut,
   NO animation) changes framing at every cut so the pose-match is masked.
 
+
+## Motion layers (typewriter hook, source tags, number count-ups)
+Driven by `build_ass.py` + `brand-config.json`, applied by `yapfull.sh`:
+- **Typewriter hook**: set `"hook_anim": "typewriter"` in brand-config (Alex = on). The
+  hook reveals character-by-character with a cursor, then holds with the accent spark on
+  the spark word. `"none"` = the old fade.
+- **Source lower-thirds + number count-ups**: per clip, drop a
+  `<workdir>/<out-slug>_overlays.json` (yapfull auto-applies it):
+  `[{"type":"source","text":"Source: Forrester, 2026","start":8.0,"end":12.0},
+    {"type":"counter","value":"23X","label":"vs everyone else","start":11.6,"end":14.2,"y":420}]`
+  Counter ticks 0->value in the accent then holds the exact `value` string (handles 23X,
+  $1B, 89%). Use for the data/educational videos. The accent colour comes from
+  `accent_hex` even when captions are scale-only.
+All real/typeset, no AI-generated assets.
+
 ## Decisions to ask (and proven defaults)
 | Decision | Default |
 |---|---|
@@ -196,6 +211,3 @@ improvising.
 - Run the batch **sequentially** in one process (the cutters are parallel-safe via
   per-output scratch, but races still risk surprises).
 - No em/en dashes anywhere on screen or in messages.
-
----
-_Created by Alex Mureșan (https://alexmuresan.com). Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0) — keep the NOTICE with any copy or derivative; commercial use: alex@alexmuresan.com._

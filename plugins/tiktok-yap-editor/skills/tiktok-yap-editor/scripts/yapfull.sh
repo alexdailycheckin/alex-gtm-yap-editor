@@ -33,8 +33,12 @@ print("INK=%s"%shlex.quote(g("ink_hex","#000000")))
 print("HANDLE=%s"%shlex.quote(g("handle","")))
 print("HFONT=%s"%shlex.quote(g("label_font", g("caption_font","Montserrat Black"))))
 print("CONTACT=%s"%shlex.quote("\n".join(g("contact_lines",[]))))
+print("HANIM=%s"%shlex.quote(g("hook_anim","none")))
 PY
 )"
+# optional per-clip extra overlays (source tags, number count-ups): <out>_overlays.json
+# (always pass --overlays, quoted; empty string when absent so paths with spaces are safe)
+OVRFILE="$WD/${OUTBASE}_overlays.json"; [ -f "$OVRFILE" ] || OVRFILE=""
 
 # 1. single-pass cut (clean CFR, dead-air, tight tails, anti-stutter crop-alt)
 python3 "$SCRIPTS/yapcut.py" --clauses "$CLAUSES" --workdir "$WD" --out "$WD/full_${OUTBASE}.mp4" \
@@ -49,7 +53,8 @@ echo "--- dur: $DUR ---"
 bash "$SCRIPTS/transcribe.sh" "$WD/full_${OUTBASE}.mp4" "$WD/w_${OUTBASE}" --words >/dev/null 2>&1
 python3 "$SCRIPTS/build_ass.py" --words "$WD/w_${OUTBASE}.json" --out "$WD/cap_${OUTBASE}.ass" \
   --preset minimal --font "$CFONT" --caps "$CCASE" --accent none --active-scale 112 \
-  --hook-y 430 --hook "$HOOK" --corrections "$CORR" >/dev/null
+  --hook-y 430 --hook "$HOOK" --hook-anim "$HANIM" --hook-spark "$HOOKWORD" \
+  --accent-hex "$ACCENT" --overlays "$OVRFILE" --corrections "$CORR" >/dev/null
 
 # 3. brand touches: accent spark on the hook word + contact block at the CTA tail
 python3 - "$WD/cap_${OUTBASE}.ass" "$HOOKWORD" "$DUR" "$ACCENT" "$BASE" "$INK" "$HANDLE" "$CONTACT" "$HFONT" <<'PY'
@@ -61,7 +66,6 @@ def hx(h):  # #RRGGBB -> ASS &H00BBGGRR
 A=hx(accent) if accent.lower() not in("none","off","") else None
 B=hx(base); I=hx(ink)
 s=open(p).read()
-if hw and A: s=s.replace(" "+hw," {\\1c%s&}%s"%(A,hw),1)
 def t(x): return "0:00:%05.2f"%x
 if handle:
     hs=max(0.0,dur-9.7)

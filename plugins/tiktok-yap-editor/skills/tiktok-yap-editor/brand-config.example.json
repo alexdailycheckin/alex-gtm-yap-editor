@@ -1,27 +1,41 @@
 {
-  "_README": "Per-creator brand config. The skill writes this on first run by interviewing you (see SKILL.md 'First run: brand discovery'). Save the real file at <footage>/.yap_build/brand-config.json or the skill root. yapfull.sh reads it. Replace the values below with yours.",
+  "_README": "Per-creator brand config. The skill writes this on first run by interviewing the creator (see SKILL.md 'First run'). Place the real file at <footage>/.yap_build/brand-config.json or the skill root. yapfull.sh reads it.",
   "_fields": {
-    "caption_font": "installed font family for captions ('Montserrat Black' = default ALL-CAPS look, or a brand display font in sentence case)",
-    "label_font": "font for the handle/contact block (a mono reads well, e.g. 'Space Mono')",
+    "creator": "name, for reference",
+    "niche": "one line: what the channel is about (drives hook/story framing)",
+    "pillars": "2-4 content pillars",
+    "accounts": "handles/accounts to reference or tag",
+    "caption_font": "installed font family for word captions (e.g. 'Montserrat Black' default, or a brand display font like 'Bricolage Grotesque ExtraBold')",
+    "label_font": "font for the handle/contact block (often a mono, e.g. 'Space Mono')",
     "caption_case": "'on' = ALL CAPS, 'off' = sentence case",
-    "accent_hex": "single spark/highlight colour like '#FF5A2A', or 'none'",
-    "base_hex": "caption fill (usually white)",
-    "ink_hex": "stroke colour (usually near-black)",
+    "accent_hex": "single spark/highlight colour, e.g. '#FF5A2A', or 'none'",
+    "base_hex": "caption fill colour (usually white/bone)",
+    "ink_hex": "stroke/shadow colour (usually near-black)",
     "handle": "on-screen handle at the CTA, e.g. 'YOURNAME.COM'",
-    "contact_lines": "extra lines under the handle (email, site)",
-    "cta_clip": "OPTIONAL absolute path to a reusable spoken-outro clip; add it as the final clause in each clauses.json"
+    "contact_lines": "extra lines under the handle, e.g. email + site",
+    "cta_clip": "OPTIONAL absolute path to a reusable spoken-outro clip; if set, add it as the final clause in each clauses.json"
   },
-  "creator": "Your Name",
-  "niche": "what your channel is about, one line",
-  "pillars": ["pillar 1", "pillar 2", "pillar 3"],
-  "accounts": ["yoursite.com"],
-  "caption_font": "Montserrat Black",
+  "creator": "Alex Muresan",
+  "niche": "go-to-market distribution (the distribution guy)",
+  "pillars": [
+    "Distribution thesis",
+    "Human OS",
+    "In the arena"
+  ],
+  "accounts": [
+    "alexmuresan.com"
+  ],
+  "caption_font": "Bricolage Grotesque ExtraBold",
   "label_font": "Space Mono",
-  "caption_case": "on",
-  "accent_hex": "none",
-  "base_hex": "#FFFFFF",
-  "ink_hex": "#111111",
-  "handle": "YOURNAME.COM",
-  "contact_lines": ["you@example.com", "yoursite.com"],
-  "cta_clip": ""
+  "caption_case": "off",
+  "accent_hex": "#FF5A2A",
+  "base_hex": "#FFFFFB",
+  "ink_hex": "#232323",
+  "handle": "ALEXMURESAN.COM",
+  "contact_lines": [
+    "alex.m@usereach.ai",
+    "usereach.ai"
+  ],
+  "cta_clip": "",
+  "hook_anim": "typewriter"
 }
