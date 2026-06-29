@@ -223,7 +223,7 @@ def main():
             if ot == "source":
                 txt = o["text"].replace("{", "(").replace("}", ")")
                 events.append((o["start"], o["end"], "Cap",
-                               f"{{\\an1\\pos(48,1500)\\fn Space Mono\\fs32\\bord4\\shad0"
+                               f"{{\\an1\\pos(48,1500)\\fn Space Mono\\fs34\\bord5\\shad2"
                                f"\\1c{base_ass}\\3c{out_ass}\\fad(150,150)}}{txt}"))
             elif ot == "counter":
                 y = o.get("y", 540)
@@ -235,11 +235,11 @@ def main():
                     st = o["start"] + (s / steps) * cdur
                     en = o["start"] + ((s + 1) / steps) * cdur
                     events.append((st, en, "Cap",
-                                   f"{{\\an5\\pos({W // 2},{y})\\fn {p['font']}\\fs118\\bord7"
-                                   f"\\1c{accent_ass}\\3c{base_ass}}}{val}"))
+                                   f"{{\\an5\\pos({W // 2},{y})\\fn {p['font']}\\fs118\\bord10\\shad3"
+                                   f"\\1c{spark_ass}\\3c{out_ass}\\4c&H00000000}}{val}"))
                 events.append((o["start"] + cdur, o["end"], "Cap",
-                               f"{{\\an5\\pos({W // 2},{y})\\fn {p['font']}\\fs118\\bord7"
-                               f"\\1c{accent_ass}\\3c{base_ass}\\fad(0,150)}}{o['value']}"))
+                               f"{{\\an5\\pos({W // 2},{y})\\fn {p['font']}\\fs118\\bord10\\shad3"
+                               f"\\1c{spark_ass}\\3c{out_ass}\\4c&H00000000\\fad(0,150)}}{o['value']}"))
                 if o.get("label"):
                     events.append((o["start"], o["end"], "Cap",
                                    f"{{\\an5\\pos({W // 2},{y + 92})\\fn Space Mono\\fs32\\fsp2"
