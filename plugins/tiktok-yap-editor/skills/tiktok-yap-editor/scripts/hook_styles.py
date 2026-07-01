@@ -93,7 +93,12 @@ def hoefler_italic_index(path):
 
 
 def tw(f, t):
-    return sum(f.getbbox(c)[2] for c in t) if t else 0
+    if not t:
+        return 0
+    try:
+        return f.getlength(t)   # advance width, keeps kerning correct
+    except Exception:
+        return f.getbbox(t)[2]
 
 
 def fit(path, texts, maxw, start, floor, index=0, variation=None):
@@ -107,13 +112,11 @@ def fit(path, texts, maxw, start, floor, index=0, variation=None):
 
 
 def center(d, y, t, f, fill, stroke=0, stroke_fill=(0, 0, 0, 255), shadow=None):
-    x = (W - tw(f, t)) // 2
-    for c in t:
-        if shadow:
-            d.text((x + shadow[0], y + shadow[1]), c, font=f, fill=shadow[2])
-        d.text((x, y), c, font=f, fill=fill,
-                stroke_width=stroke, stroke_fill=stroke_fill)
-        x += f.getbbox(c)[2]
+    # draw the whole line at once so kerning/ligatures stay correct
+    x = int((W - tw(f, t)) // 2)
+    if shadow:
+        d.text((x + shadow[0], y + shadow[1]), t, font=f, fill=shadow[2])
+    d.text((x, y), t, font=f, fill=fill, stroke_width=stroke, stroke_fill=stroke_fill)
 
 
 def main():
@@ -166,8 +169,11 @@ def main():
             sf = fit(path, [a.payoff], MAXW, int(big.size * 0.52), 30)
             center(d, y + 20, a.payoff, sf, white, shadow=sh)
 
-    else:  # branded: Anton accent setup + Hoefler italic white payoff, no outline/shadow
-        anton = find_font("Anton") or find_font(brand_sans)
+    else:  # branded: condensed-display accent setup + Hoefler italic white payoff, no outline/shadow
+        # setup face is configurable (brand-config hook_display_font); default Anton.
+        # thicker options you may have: "Gotham Black", "Montserrat Black", "Impact".
+        display_font = cfg.get("hook_display_font") or "Anton"
+        anton = find_font(display_font) or find_font("Anton") or find_font(brand_sans)
         hoef = find_font("Hoefler Text") or find_font("Georgia") or find_font("Times New Roman")
         hi = hoefler_italic_index(hoef) if hoef and hoef.lower().endswith(".ttc") else 0
         big = fit(anton, setup, MAXW, 120, 60)
